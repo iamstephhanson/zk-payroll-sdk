@@ -1,5 +1,6 @@
 export * from "./symbols";
 export * from "./supportedAssets";
+export * from "./assetAvailability";
 export * from "./amountParsing";
 export * from "./amountNormalization";
 export * from "./AssetRegistry";

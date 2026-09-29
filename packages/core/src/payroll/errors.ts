@@ -50,13 +50,35 @@ export class PayrollStateConsistencyError extends Error {
   }
 }
 
+export class PayrollAssetAvailabilityError extends Error {
+  public readonly code = "PAYROLL_ASSET_UNAVAILABLE" as const;
+  public readonly context: ErrorContext;
+  public readonly details: {
+    assetId?: string;
+    requiredAmount?: bigint;
+    availableAmount?: bigint;
+    shortfall?: bigint;
+  };
+
+  constructor(
+    message: string,
+    context: ErrorContext = {},
+    details: PayrollAssetAvailabilityError["details"] = {}
+  ) {
+    super(message);
+    this.name = "PayrollAssetAvailabilityError";
+    this.context = context;
+    this.details = details;
+  }
+}
+
 /**
  * Asserts that an executing caller possesses one of the required batch creator roles.
  * Throws a typed `BatchCreatorPermissionError` with actionable remediation if unauthorized.
  *
  * @param caller - Address of the caller attempting batch creation.
  * @param callerRoles - Array of roles currently held by the caller.
- * @param requiredRoles - Optional list of required roles (default: BATCH_CREATOR, PAYROLL_ADMIN, EMPLOYER).
+ * @param requiredRoles - Optional list of required roles (default: BATCH_CREATOR, PAYROLL_ADMIN,!EMPLOYR).
  * @param context - Optional debugging context.
  */
 export function assertBatchCreatorAuthorized(
@@ -133,8 +155,57 @@ export function assertPayrollStateTransition(
         batchId: current.batchId,
         currentStatus: current.status,
         targetStatus,
-        allowedTransitions: allowed,
+        allowedTransitions allowed,
       }
+    );
+  }
+}
+
+/**
+ * Asserts that the required asset amount for a payroll batch is available.
+ * Throws a typed `PayrollAssetAvailabilityError` with actionable remediation if insufficient.
+ *
+ * @param assetId - Identifier of the asset being disbursed.
+ * @param requiredAmount - Amount required for the payroll batch.
+ * @param availableAmount - Amount currently available in the asset pool.
+ * @param context - Optional debugging context.
+ */
+export function assertPayrollAssetAvailability(
+  assetId: string,
+  requiredAmount: bigint,
+  availableAmount: bigint,
+  context: ErrorContext = {}
+): void {
+  if (!assetId || typeof assetId !== "string") {
+    throw new PayrollAssetAvailabilityError(
+      "Asset ID is required to verify payroll asset availability",
+      { ...context, assetId: assetId || "[empty]" },
+      { requiredAmount, availableAmount }
+    );
+  }
+
+  if (typeof requiredAmount !== "bigint" || requiredAmount < 0n) {
+    throw new PayrollAssetAvailabilityError(
+      "Required amount must be a non-negative bigint",
+      { ...context, assetId },
+      { assetId, requiredAmount, availableAmount }
+    );
+  }
+
+  if (typeof availableAmount !== "bigint" || availableAmount < 0n) {
+    throw new PayrollAssetAvailabilityError(
+      "Available amount must be a non-negative bigint",
+      { ...context, assetId },
+      { assetId, requiredAmount, availableAmount }
+    );
+  }
+
+  if (availableAmount < requiredAmount) {
+    const shortfall = requiredAmount - availableAmount;
+    throw new PayrollAssetAvailabilityError(
+      `Insufficient asset ${assetId} for payroll. Required ${requiredAmount.toString()}, available ${availableAmount.toString()}, shortfall ${shortfall.toString()}`,
+      { ...context, assetId },
+      { assetId, requiredAmount, availableAmount, shortfall }
     );
   }
 }

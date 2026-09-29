@@ -20,3 +20,4 @@ export * from "./periodOwnershipReader";
 export * from "./payrollSubmissionSequenceValidator";
 export * from "./payrollStateConsistencyGuard";
 export * from "./calendarOverlap";
+export * from "./assetAvailability";
